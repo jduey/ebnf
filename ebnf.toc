@@ -1,0 +1,94 @@
+
+(add-ns p (git-dependency "github.com:jduey/parser.git" "parser.toc"))
+(add-ns st (git-dependency "github.com:jduey/state.git" "state.toc"))
+
+(defn get* [l x]
+  (flat-map (first l)
+            (fn [[k v]]
+              (or (and (= x k) (maybe v))
+                  (get* (rest l) x)))))
+
+(deftype assoc-list [l]
+  Associative
+  (assoc [m k v]
+    (extract (or (get* l m)
+                 (maybe (assoc-list (cons (list k v) l))))))
+  (get [m k]
+    (get* l k)))
+
+(defprotocol Make-EBNF
+  (ebnf [_]
+    (st/state "")))
+
+(extend-type Function
+  Make-EBNF
+  (ebnf [f]
+    (st/state list)))
+
+(extend-type p/ignore-rule
+  Make-EBNF
+  (ebnf [r]
+    (.rule r)))
+
+(extend-type p/parser-term-fn
+  Make-EBNF
+  (ebnf [terminal]
+    (st/state (str (.f terminal)))))
+
+(extend-type p/parser-terminal
+  Make-EBNF
+  (ebnf [terminal]
+    (st/state (str "'" (.term-str terminal) "'"))))
+
+(extend-type p/parser-not-char
+  Make-EBNF
+  (ebnf [terminal]
+    (st/state (str "not '" (.test-c terminal) "'"))))
+
+(extend-type p/parser-char-range
+  Make-EBNF
+  (ebnf [r]
+    (st/state (str "'" (.lower r) "'-'" (.higher r) "'"))))
+
+(extend-type p/Union
+  Make-EBNF
+  (ebnf [r]
+    (apply* (st/state (fn [& children]
+                        (apply str (interpose children " | "))))
+            (.rules r))))
+
+(extend-type p/Cat
+  Make-EBNF
+  (ebnf [r]
+    (apply* (st/state (fn [& children]
+                        (apply str (interpose children ", "))))
+            (.rules r))))
+
+(extend-type p/repeat-rule
+  Make-EBNF
+  (ebnf [r]
+    (map (.rule r) (fn [r-str] (str r-str ", { " r-str " }")))))
+
+(extend-type p/none-or-more-rule
+  Make-EBNF
+  (ebnf [r]
+    (map (.rule r) (fn [r-str] (str "{ " r-str " }")))))
+
+(extend-type p/recursion-rule
+  Make-EBNF
+  (ebnf [r]
+    (st/state (.rule-name r))))
+
+(extend-type p/parser-rule
+  Make-EBNF
+  (ebnf [r]
+    (for [rule (.grammar r)
+          _ (st/set-val (.name r) rule)]
+      (.name r))))
+
+(extend-type p/recursive-parser-rule
+  Make-EBNF
+  (ebnf [r]
+    (for [rule (.grammar r)
+          _ (st/set-val (.name r) rule)]
+      (.name r))))

@@ -1,0 +1,61 @@
+
+(add-ns fr (git-dependency "github.com:jduey/free.git" "free.toc"))
+(add-ns p (git-dependency "github.com:jduey/parser.git" "parser.toc"))
+(add-ns e (module "ebnf.toc"))
+
+;; sample Grammar
+;; ------------------
+;; digit := “0” | “1” ...  | “9”;
+;; letter := “a” | “b” ... | “z”;
+;; number := [“-”], digit, {digit};
+;; symbol := letter, {digit | letter};
+;; expression := “(“, {symbol | number | expression}, “)”;
+
+(def letter
+  (p/rule "letter"
+          (p/one-of "abcdefghijklmnopqrstuvwxyz")))
+
+(def digit
+  (p/rule "digit"
+          (p/one-of "0123456789")))
+
+(def number
+  (p/rule "number"
+          (p/all (p/optional (p/term "-"))
+                 (p/one-or-more digit))))
+
+(def sym
+  (p/rule "symbol"
+          (map (p/all letter (p/none-or-more (p/any digit letter)))
+               (fn [head tail]
+                 (apply str head tail)))))
+
+(def sub-expression
+  (p/recurse "expression"))
+
+(def expression
+  (p/rule "expression"
+          (apply-to str
+                    (p/term "(")
+                    (p/none-or-more (p/any sym number
+                                           sub-expression))
+                    (p/term ")"))))
+
+(defprotocol Escaper
+  (escape-rule [r]))
+
+(extend-type String
+  Escaper
+  (escape-rule [s] (escape-chars s)))
+
+(extend-type List
+  Escaper
+  (escape-rule [l] (apply str (map (interpose l ", ") escape-rule))))
+
+(main [_]
+      (let [[s rules] ((fr/evaluate expression e/ebnf) {})]
+        (or (and (empty? rules) (maybe (println s)))
+            (and (maybe (map (seq rules) (fn [[name rule]]
+                                           (println name "=" (escape-rule rule) ";"))))
+                 (maybe (println s)))
+            )))
