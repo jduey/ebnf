@@ -9,9 +9,22 @@
                   (get* (rest l) x)))))
 
 (deftype assoc-list [l]
+  Composition
+  (comp* [_ ls]
+    (assoc-list (for [a-list ls
+                      [k v] (seq a-list)]
+                  (assoc l k v))))
+
+  Traversable
+  (seq [_] l)
+
+  Collection
+  (empty? [_]
+    (= 0 (count l)))
+
   Associative
   (assoc [m k v]
-    (extract (or (get* l m)
+    (extract (or (and (get* l k) (maybe m))
                  (maybe (assoc-list (cons (list k v) l))))))
   (get [m k]
     (get* l k)))

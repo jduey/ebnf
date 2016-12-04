@@ -53,9 +53,8 @@
   (escape-rule [l] (apply str (map (interpose l ", ") escape-rule))))
 
 (main [_]
-      (let [[s rules] ((fr/evaluate expression e/ebnf) {})]
+      (let [[s rules] ((fr/evaluate expression e/ebnf) (e/assoc-list empty-list))]
         (or (and (empty? rules) (maybe (println s)))
-            (and (maybe (map (seq rules) (fn [[name rule]]
-                                           (println name "=" (escape-rule rule) ";"))))
-                 (maybe (println s)))
-            )))
+            (and (maybe (map (reverse (seq rules)) (fn [[name rule]]
+                                                     (println name "=" (escape-rule rule) ";"))))
+                 (maybe (println s))))))
